@@ -5,8 +5,8 @@ export class ChatGPTApiRequestMessageDTO {
     @IsNotEmpty()
     @IsString()
     readonly accessKey: string;
-    
+
     @IsNotEmpty()
     @IsArray()
-    readonly message: ChatCompletionRequestMessage[];
+    readonly messages: any;
 }

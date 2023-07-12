@@ -19,7 +19,7 @@ export class ChatGPTApiController {
     async requestChatGPTMessage(@Body() body: ChatGPTApiRequestMessageDTO) : Promise<Optional<any>> {
         const accessKeyCheckResult = await checkAuthorizationHeaderValue(prisma, body.accessKey);
         if (accessKeyCheckResult.result == OptionalResult.SUCCESS && accessKeyCheckResult.data) {
-            const gptResult = await this.chatGPTApiService.requestChatGPTMessage(body.message);
+            const gptResult = await this.chatGPTApiService.requestChatGPTMessage(body.messages);
             if (gptResult.result == OptionalResult.SUCCESS) {
                 await useAccessKey(prisma, body.accessKey);
             }
