@@ -21,6 +21,40 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
         }).catch(error => {
             throw new Error(error);
         });
+        
+        const limitInfo : Optional<AccessKeyLimitInfoInterface> = await getAccessKeyLimitInfo(prisma, accessKey);     
+        let isReset : boolean = false;
+        switch (limitInfo.data.limit_type) {
+            case "DAY": {
+                if (moment().diff(moment(limitInfo.data.limit_reset), 'day') >= 1) {
+                    isReset = true;
+                }
+
+                break;
+            }
+
+            case "MONTH": {
+                if (moment().diff(moment(limitInfo.data.limit_reset), 'month') >= 1) {
+                    isReset = true;
+                }
+
+                break;
+            }
+        }
+
+        if (isReset) {
+            await prisma.chat_gpt_api_auth.update({
+                data: {
+                    limit_current: 0,
+                    limit_reset: new Date(),
+                },
+                where: {
+                    id: limitInfo.data.id,
+                },
+            }).catch(error => {
+                throw new Error(error);
+            });
+        }            
 
         switch (select.type) {
             case "DISABLE":
@@ -47,13 +81,10 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
                     
                     case "DAY":
                     case "MONTH": {
-                        const limitInfo : Optional<AccessKeyLimitInfoInterface> = await getAccessKeyLimitInfo(prisma, accessKey);
-                        
-                        let isReset : boolean = false;
-
-                        switch (limitInfo.data.limit_type) {
+                        const limitInfoNew : Optional<AccessKeyLimitInfoInterface> = await getAccessKeyLimitInfo(prisma, accessKey);
+                        switch (limitInfoNew.data.limit_type) {
                             case "DAY": {
-                                if (moment().diff(moment(limitInfo.data.limit_reset), 'day') >= 1) {
+                                if (moment().diff(moment(limitInfoNew.data.limit_reset), 'day') >= 1) {
                                     isReset = true;
                                 }
             
@@ -61,7 +92,7 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
                             }
             
                             case "MONTH": {
-                                if (moment().diff(moment(limitInfo.data.limit_reset), 'month') >= 1) {
+                                if (moment().diff(moment(limitInfoNew.data.limit_reset), 'month') >= 1) {
                                     isReset = true;
                                 }
             
@@ -76,15 +107,15 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
                                     limit_reset: new Date(),
                                 },
                                 where: {
-                                    id: limitInfo.data.id,
+                                    id: limitInfoNew.data.id,
                                 },
                             }).catch(error => {
                                 throw new Error(error);
                             });
                         }            
 
-                        if (limitInfo.result == OptionalResult.SUCCESS &&
-                            limitInfo.data.limit_value > limitInfo.data.limit_current) {
+                        if (limitInfoNew.result == OptionalResult.SUCCESS &&
+                            limitInfoNew.data.limit_value > limitInfoNew.data.limit_current) {
                             result = {
                                 result: OptionalResult.SUCCESS,
                                 data: true,
