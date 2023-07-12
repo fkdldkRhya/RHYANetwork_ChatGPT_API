@@ -25,7 +25,7 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
         switch (select.type) {
             case "DISABLE":
                 result = {
-                    result: OptionalResult.SUCCESS,
+                    result: OptionalResult.FAIL,
                     data: false,
                     message: "해당 ACCESS KEY가 존재하지 않거나 비활성화되었습니다."
                 }
@@ -48,7 +48,41 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
                     case "DAY":
                     case "MONTH": {
                         const limitInfo : Optional<AccessKeyLimitInfoInterface> = await getAccessKeyLimitInfo(prisma, accessKey);
-        
+                        
+                        let isReset : boolean = false;
+
+                        switch (limitInfo.data.limit_type) {
+                            case "DAY": {
+                                if (moment().diff(moment(limitInfo.data.limit_reset), 'day') >= 1) {
+                                    isReset = true;
+                                }
+            
+                                break;
+                            }
+            
+                            case "MONTH": {
+                                if (moment().diff(moment(limitInfo.data.limit_reset), 'month') >= 1) {
+                                    isReset = true;
+                                }
+            
+                                break;
+                            }
+                        }
+            
+                        if (isReset) {
+                            await prisma.chat_gpt_api_auth.update({
+                                data: {
+                                    limit_current: 0,
+                                    limit_reset: new Date(),
+                                },
+                                where: {
+                                    id: limitInfo.data.id,
+                                },
+                            }).catch(error => {
+                                throw new Error(error);
+                            });
+                        }            
+
                         if (limitInfo.result == OptionalResult.SUCCESS &&
                             limitInfo.data.limit_value > limitInfo.data.limit_current) {
                             result = {
@@ -58,7 +92,7 @@ export async function checkAuthorizationHeaderValue(prisma : PrismaClient, acces
                             };
                         }else {
                             result = {
-                                result: OptionalResult.SUCCESS,
+                                result: OptionalResult.FAIL,
                                 data: false,
                                 message: "ChatGPT API 요청 허용량이 초과되었습니다."
                             };
@@ -85,40 +119,6 @@ export async function useAccessKey(prisma : PrismaClient, accessKey: string) : P
     try {
         const limitInfo : Optional<AccessKeyLimitInfoInterface> = await getAccessKeyLimitInfo(prisma, accessKey);
         if (limitInfo.result == OptionalResult.SUCCESS) {
-            let isReset : boolean = false;
-
-            switch (limitInfo.data.limit_type) {
-                case "DAY": {
-                    if (moment().diff(moment(limitInfo.data.limit_reset), 'day') >= 1) {
-                        isReset = true;
-                    }
-
-                    break;
-                }
-
-                case "MONTH": {
-                    if (moment().diff(moment(limitInfo.data.limit_reset), 'month') >= 1) {
-                        isReset = true;
-                    }
-
-                    break;
-                }
-            }
-
-            if (isReset) {
-                await prisma.chat_gpt_api_auth.update({
-                    data: {
-                        limit_current: 0,
-                        limit_reset: new Date(),
-                    },
-                    where: {
-                        id: limitInfo.data.id,
-                    },
-                }).catch(error => {
-                    throw new Error(error);
-                });
-            }
-
             if (limitInfo.data.limit_value > limitInfo.data.limit_current) {
                 await prisma.chat_gpt_api_auth.update({
                     data: {
@@ -137,7 +137,6 @@ export async function useAccessKey(prisma : PrismaClient, accessKey: string) : P
             throw new Error("해당 ACCESS KEY가 존재하지 않거나 비활성화되었습니다.");
         }
     }catch(error: any) {
-        console.log(error);
         throw new Error(error.message);
     }
 }
