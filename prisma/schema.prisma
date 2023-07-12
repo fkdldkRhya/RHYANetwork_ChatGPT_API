@@ -10,7 +10,7 @@ datasource db {
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model chat_gpt_api_auth {
   id            Int                          @id @default(autoincrement()) @db.UnsignedInt
-  key           String                       @unique(map: "key") @db.VarChar(256)
+  key           String                       @unique(map: "key") @default(dbgenerated("(sha2(concat(uuid(),'RNChatGPTKey-229438'),512))")) @db.VarChar(256)
   create_at     DateTime                     @default(now()) @db.Timestamp(0)
   description   String                       @default("Default") @db.VarChar(100)
   type          chat_gpt_api_auth_type       @default(DEFAULT)
